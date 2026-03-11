@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="imesh_ayya"
+        android:label="Sunterra DO Unit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

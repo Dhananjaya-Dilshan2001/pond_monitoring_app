@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:imesh_ayya/core/app_sizes.dart';
 import 'package:imesh_ayya/screen/logging_screen.dart';
 import 'package:imesh_ayya/main.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -551,25 +552,27 @@ class _PondDashboardState extends State<PondDashboard>
             backgroundColor: Color(0xFF4A90E2),
             title: Text(
               'Disable Auto Mode?',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
             content: Text(
               'This motor is in auto mode. Do you want to disable auto mode and control it manually?',
-              style: TextStyle(color: Colors.white70),
+              style: context.textStyles.body.copyWith(color: Colors.white70),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: Text('Cancel', style: TextStyle(color: Colors.white70)),
+                child: Text(
+                  'Cancel',
+                  style: context.textStyles.body.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text(
                   'Disable Auto',
-                  style: TextStyle(color: Colors.white),
+                  style: context.textStyles.body.copyWith(color: Colors.white),
                 ),
               ),
             ],
@@ -793,10 +796,8 @@ class _PondDashboardState extends State<PondDashboard>
                         children: [
                           Text(
                             'Pond Monitoring System',
-                            style: TextStyle(
+                            style: context.textStyles.subtitle.copyWith(
                               color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
                               shadows: [
                                 Shadow(
                                   color: Colors.black.withOpacity(0.3),
@@ -810,9 +811,8 @@ class _PondDashboardState extends State<PondDashboard>
                           ),
                           Text(
                             'Device: $deviceId',
-                            style: TextStyle(
+                            style: context.textStyles.caption.copyWith(
                               color: Colors.white70,
-                              fontSize: 11,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -874,8 +874,7 @@ class _PondDashboardState extends State<PondDashboard>
                           SizedBox(width: 6),
                           Text(
                             connectionStatus,
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: context.textStyles.bodySmall.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -915,10 +914,8 @@ class _PondDashboardState extends State<PondDashboard>
                     Flexible(
                       child: Text(
                         'Water Quality: ${getWaterQuality()}',
-                        style: TextStyle(
+                        style: context.textStyles.subtitle.copyWith(
                           color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -926,7 +923,9 @@ class _PondDashboardState extends State<PondDashboard>
                     SizedBox(width: 8),
                     Text(
                       'Last: $lastUpdate',
-                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                      style: context.textStyles.caption.copyWith(
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
                 ),
@@ -978,16 +977,15 @@ class _PondDashboardState extends State<PondDashboard>
                         SizedBox(width: 8),
                         Text(
                           'Motor Controls',
-                          style: TextStyle(
+                          style: context.textStyles.subtitle.copyWith(
                             color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                     SizedBox(height: 12),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: List.generate(5, (index) {
                         return Expanded(child: _buildMotorSwitch(index));
@@ -1062,7 +1060,9 @@ class _PondDashboardState extends State<PondDashboard>
                 padding: EdgeInsets.all(15),
                 child: Text(
                   'Messages: $messagesReceived | ${motorStates.where((state) => state).length}/5 Motors Active',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  style: context.textStyles.bodySmall.copyWith(
+                    color: Colors.white70,
+                  ),
                 ),
               ),
             ],
@@ -1092,9 +1092,8 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               'Temperature',
-              style: TextStyle(
+              style: context.textStyles.body.copyWith(
                 color: Colors.white,
-                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1118,17 +1117,13 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               '${displayedTemperature.toStringAsFixed(1)}°C',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
 
           Text(
             _getTemperatureStatus(displayedTemperature),
-            style: TextStyle(color: Colors.white70, fontSize: 11),
+            style: context.textStyles.caption.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -1155,9 +1150,8 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               'pH Level',
-              style: TextStyle(
+              style: context.textStyles.body.copyWith(
                 color: Colors.white,
-                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1180,17 +1174,13 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               displayedPhLevel.toStringAsFixed(1),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
 
           Text(
             _getPhStatus(displayedPhLevel),
-            style: TextStyle(color: Colors.white70, fontSize: 11),
+            style: context.textStyles.caption.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -1217,9 +1207,8 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               'Dissolved O₂',
-              style: TextStyle(
+              style: context.textStyles.body.copyWith(
                 color: Colors.white,
-                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1249,17 +1238,13 @@ class _PondDashboardState extends State<PondDashboard>
             fit: BoxFit.scaleDown,
             child: Text(
               '${displayedDissolvedOxygen.toStringAsFixed(1)} mg/L',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
 
           Text(
             _getOxygenStatus(displayedDissolvedOxygen),
-            style: TextStyle(color: Colors.white70, fontSize: 11),
+            style: context.textStyles.caption.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -1360,9 +1345,8 @@ class _PondDashboardState extends State<PondDashboard>
 
               Text(
                 motorNames[index],
-                style: TextStyle(
+                style: context.textStyles.micro.copyWith(
                   color: Colors.white,
-                  fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -1377,9 +1361,8 @@ class _PondDashboardState extends State<PondDashboard>
                 children: [
                   Text(
                     motorStates[index] ? 'ON' : 'OFF',
-                    style: TextStyle(
+                    style: context.textStyles.caption.copyWith(
                       color: motorStates[index] ? Colors.red : Colors.white54,
-                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1395,9 +1378,8 @@ class _PondDashboardState extends State<PondDashboard>
                       ),
                       child: Text(
                         'AUTO',
-                        style: TextStyle(
+                        style: context.textStyles.micro.copyWith(
                           color: Colors.white,
-                          fontSize: 8,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

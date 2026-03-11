@@ -132,7 +132,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   Text(
                     'Connect to Your Device',
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
+                    style: context.textStyles.title.copyWith(
+                      color: Colors.white70,
+                    ),
                   ),
 
                   SizedBox(height: 40),
@@ -153,12 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         TextField(
                           controller: _deviceIdController,
-                          style: TextStyle(color: Colors.white),
+                          style: context.textStyles.input.copyWith(
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Device ID',
-                            labelStyle: TextStyle(color: Colors.white70),
+                            labelStyle: context.textStyles.inputLabel,
                             hintText: 'Enter your device ID (e.g., DEVICE_001)',
-                            hintStyle: TextStyle(color: Colors.white54),
+                            hintStyle: context.textStyles.inputHint,
                             prefixIcon: Icon(
                               Icons.devices,
                               color: Colors.white70,
@@ -181,12 +185,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _passwordController,
                           obscureText: true,
-                          style: TextStyle(color: Colors.white),
+                          style: context.textStyles.input.copyWith(
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            labelStyle: TextStyle(color: Colors.white70),
+                            labelStyle: context.textStyles.inputLabel,
                             hintText: 'Enter device password',
-                            hintStyle: TextStyle(color: Colors.white54),
+                            hintStyle: context.textStyles.inputHint,
                             prefixIcon: Icon(Icons.lock, color: Colors.white70),
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
@@ -218,10 +224,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? CircularProgressIndicator(color: Colors.white)
                                 : Text(
                                     'Connect to Device',
-                                    style: TextStyle(
+                                    style: context.textStyles.button.copyWith(
                                       color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                           ),
@@ -246,7 +250,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Expanded(
                                   child: Text(
                                     _errorMessage,
-                                    style: TextStyle(color: Colors.white),
+                                    style: context.textStyles.body.copyWith(
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ],

@@ -1,7 +1,10 @@
+import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:imesh_ayya/core/app_sizes.dart';
 import 'package:imesh_ayya/screen/logging_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -13,6 +16,8 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   if (defaultTargetPlatform == TargetPlatform.windows) {
     await windowManager.ensureInitialized();
@@ -30,7 +35,7 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(MyApp());
+  runApp(DevicePreview(enabled: false, builder: (context) => const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -46,8 +51,14 @@ class MyApp extends StatelessWidget {
         navigatorKey: appNavigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'Pond Monitoring System',
-        theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Roboto'),
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          fontFamily: 'PlusJakartaSans',
+        ),
         home: LoginScreen(),
+        useInheritedMediaQuery: true,
+        locale: DevicePreview.locale(context),
+        builder: DevicePreview.appBuilder,
       ),
     );
   }
@@ -164,10 +175,8 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                     Expanded(
                       child: Text(
                         'Motor Configuration',
-                        style: TextStyle(
+                        style: context.textStyles.h2.copyWith(
                           color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -231,7 +240,7 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                         ),
                         child: Text(
                           'Motor ${index + 1}',
-                          style: TextStyle(
+                          style: context.textStyles.body.copyWith(
                             color: Colors.white,
                             fontWeight: currentMotor == index
                                 ? FontWeight.bold
@@ -287,18 +296,14 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
             // Motor Name
             Text(
               'Motor Name',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
             SizedBox(height: 10),
             TextField(
-              style: TextStyle(color: Colors.white),
+              style: context.textStyles.input.copyWith(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Enter motor name',
-                hintStyle: TextStyle(color: Colors.white54),
+                hintStyle: context.textStyles.inputHint,
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: Colors.white.withOpacity(0.5)),
                   borderRadius: BorderRadius.circular(12),
@@ -322,10 +327,8 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
               children: [
                 Text(
                   'Auto Mode',
-                  style: TextStyle(
+                  style: context.textStyles.subtitle.copyWith(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Switch(
@@ -346,10 +349,8 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
               // Parameter Selection
               Text(
                 'Control Parameter',
-                style: TextStyle(
+                style: context.textStyles.subtitle.copyWith(
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
               SizedBox(height: 10),
@@ -368,27 +369,33 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                     ),
                   ),
                   dropdownColor: Color(0xFF4A90E2),
-                  style: TextStyle(color: Colors.white),
+                  style: context.textStyles.body.copyWith(color: Colors.white),
                   items: [
                     DropdownMenuItem(
                       value: 'temperature',
                       child: Text(
                         'Temperature (°C)',
-                        style: TextStyle(color: Colors.white),
+                        style: context.textStyles.body.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     DropdownMenuItem(
                       value: 'ph_level',
                       child: Text(
                         'pH Level',
-                        style: TextStyle(color: Colors.white),
+                        style: context.textStyles.body.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     DropdownMenuItem(
                       value: 'dissolved_oxygen',
                       child: Text(
                         'Dissolved Oxygen (mg/L)',
-                        style: TextStyle(color: Colors.white),
+                        style: context.textStyles.body.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -405,10 +412,8 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
               // Turn On When
               Text(
                 'Turn ON When',
-                style: TextStyle(
+                style: context.textStyles.subtitle.copyWith(
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
               SizedBox(height: 10),
@@ -427,20 +432,24 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                     ),
                   ),
                   dropdownColor: Color(0xFF4A90E2),
-                  style: TextStyle(color: Colors.white),
+                  style: context.textStyles.body.copyWith(color: Colors.white),
                   items: [
                     DropdownMenuItem(
                       value: 'below_min',
                       child: Text(
                         'Below Minimum',
-                        style: TextStyle(color: Colors.white),
+                        style: context.textStyles.body.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     DropdownMenuItem(
                       value: 'above_max',
                       child: Text(
                         'Above Maximum',
-                        style: TextStyle(color: Colors.white),
+                        style: context.textStyles.body.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -463,18 +472,19 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                       children: [
                         Text(
                           'Minimum Value',
-                          style: TextStyle(
+                          style: context.textStyles.body.copyWith(
                             color: Colors.white,
-                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
-                          style: TextStyle(color: Colors.white),
+                          style: context.textStyles.input.copyWith(
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
                             hintText: '0.0',
-                            hintStyle: TextStyle(color: Colors.white54),
+                            hintStyle: context.textStyles.inputHint,
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
                                 color: Colors.white.withOpacity(0.5),
@@ -507,18 +517,19 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                       children: [
                         Text(
                           'Maximum Value',
-                          style: TextStyle(
+                          style: context.textStyles.body.copyWith(
                             color: Colors.white,
-                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
-                          style: TextStyle(color: Colors.white),
+                          style: context.textStyles.input.copyWith(
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
                             hintText: '50.0',
-                            hintStyle: TextStyle(color: Colors.white54),
+                            hintStyle: context.textStyles.inputHint,
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
                                 color: Colors.white.withOpacity(0.5),
@@ -562,9 +573,8 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                   children: [
                     Text(
                       'Auto Control Logic:',
-                      style: TextStyle(
+                      style: context.textStyles.body.copyWith(
                         color: Colors.white,
-                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -573,7 +583,9 @@ class _MotorConfigScreenState extends State<MotorConfigScreen> {
                       configs[motorIndex].turnOnWhen == 'below_min'
                           ? '• Turn ON when ${_getParameterName(configs[motorIndex].parameter)} < ${configs[motorIndex].minValue}\n• Turn OFF when ${_getParameterName(configs[motorIndex].parameter)} > ${configs[motorIndex].maxValue}'
                           : '• Turn ON when ${_getParameterName(configs[motorIndex].parameter)} > ${configs[motorIndex].maxValue}\n• Turn OFF when ${_getParameterName(configs[motorIndex].parameter)} < ${configs[motorIndex].minValue}',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style: context.textStyles.bodySmall.copyWith(
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
                 ),
@@ -613,8 +625,6 @@ class ThermometerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..strokeWidth = 2;
-
     final outlinePaint = Paint()
       ..color = Colors.white.withOpacity(0.8)
       ..strokeWidth = 3
@@ -741,9 +751,8 @@ class PhScalePainter extends CustomPainter {
     for (int i = 0; i <= 14; i += 2) {
       textPaint.text = TextSpan(
         text: '$i',
-        style: TextStyle(
+        style: AppTextStyles.micro.copyWith(
           color: Colors.white.withOpacity(0.7),
-          fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
       );
@@ -903,9 +912,8 @@ class OxygenGaugePainter extends CustomPainter {
           if (oxygenValue % 5 == 0) {
             textPainter.text = TextSpan(
               text: '$oxygenValue',
-              style: TextStyle(
+              style: AppTextStyles.micro.copyWith(
                 color: Colors.white.withOpacity(0.9),
-                fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
             );
