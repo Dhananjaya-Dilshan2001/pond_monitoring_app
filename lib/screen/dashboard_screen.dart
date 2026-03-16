@@ -4,11 +4,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:imesh_ayya/core/app_sizes.dart';
-import 'package:imesh_ayya/screen/logging_screen.dart';
-import 'package:imesh_ayya/main.dart';
+import 'package:pond_monitoring_app/core/app_sizes.dart';
+import 'package:pond_monitoring_app/main.dart';
+import 'package:pond_monitoring_app/screen/logging_screen.dart';
+import 'package:pond_monitoring_app/screen/graph_screen.dart';
+
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
+import 'package:pond_monitoring_app/main.dart';
 
 class PondDashboard extends StatefulWidget {
   final String deviceId;
@@ -44,7 +47,7 @@ class _PondDashboardState extends State<PondDashboard>
 
   MqttServerClient? client;
   StreamSubscription<List<MqttReceivedMessage<MqttMessage?>>>?
-  _mqttUpdatesSubscription;
+      _mqttUpdatesSubscription;
 
   // Sensor Data (actual values from MQTT)
   String connectionStatus = "Connecting...";
@@ -180,30 +183,28 @@ class _PondDashboardState extends State<PondDashboard>
     ).animate(_rotationController);
 
     // Initialize sensor animations to start at current values
-    _temperatureAnimation =
-        Tween<double>(
-          begin: displayedTemperature,
-          end: displayedTemperature,
-        ).animate(
-          CurvedAnimation(
-            parent: _temperatureController,
-            curve: Curves.easeInOutCubic,
-          ),
-        );
-    _phAnimation = Tween<double>(begin: displayedPhLevel, end: displayedPhLevel)
-        .animate(
-          CurvedAnimation(parent: _phController, curve: Curves.easeInOutCubic),
-        );
-    _oxygenAnimation =
-        Tween<double>(
-          begin: displayedDissolvedOxygen,
-          end: displayedDissolvedOxygen,
-        ).animate(
-          CurvedAnimation(
-            parent: _oxygenController,
-            curve: Curves.easeInOutCubic,
-          ),
-        );
+    _temperatureAnimation = Tween<double>(
+      begin: displayedTemperature,
+      end: displayedTemperature,
+    ).animate(
+      CurvedAnimation(
+        parent: _temperatureController,
+        curve: Curves.easeInOutCubic,
+      ),
+    );
+    _phAnimation =
+        Tween<double>(begin: displayedPhLevel, end: displayedPhLevel).animate(
+      CurvedAnimation(parent: _phController, curve: Curves.easeInOutCubic),
+    );
+    _oxygenAnimation = Tween<double>(
+      begin: displayedDissolvedOxygen,
+      end: displayedDissolvedOxygen,
+    ).animate(
+      CurvedAnimation(
+        parent: _oxygenController,
+        curve: Curves.easeInOutCubic,
+      ),
+    );
     _bubbleAnimation = Tween<double>(
       begin: 0,
       end: 1,
@@ -393,38 +394,37 @@ class _PondDashboardState extends State<PondDashboard>
         // Only animate if change is significant
         _temperatureAnimation =
             Tween<double>(begin: oldDisplayedTemp, end: temperature).animate(
-              CurvedAnimation(
-                parent: _temperatureController,
-                curve: Curves.easeInOutCubic,
-              ),
-            );
+          CurvedAnimation(
+            parent: _temperatureController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
         _temperatureController.reset();
         _temperatureController.forward();
       }
 
       if ((oldDisplayedPh - phLevel).abs() > 0.05) {
-        _phAnimation = Tween<double>(begin: oldDisplayedPh, end: phLevel)
-            .animate(
-              CurvedAnimation(
-                parent: _phController,
-                curve: Curves.easeInOutCubic,
-              ),
-            );
+        _phAnimation =
+            Tween<double>(begin: oldDisplayedPh, end: phLevel).animate(
+          CurvedAnimation(
+            parent: _phController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
         _phController.reset();
         _phController.forward();
       }
 
       if ((oldDisplayedOxygen - dissolvedOxygen).abs() > 0.1) {
-        _oxygenAnimation =
-            Tween<double>(
-              begin: oldDisplayedOxygen,
-              end: dissolvedOxygen,
-            ).animate(
-              CurvedAnimation(
-                parent: _oxygenController,
-                curve: Curves.easeInOutCubic,
-              ),
-            );
+        _oxygenAnimation = Tween<double>(
+          begin: oldDisplayedOxygen,
+          end: dissolvedOxygen,
+        ).animate(
+          CurvedAnimation(
+            parent: _oxygenController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
         _oxygenController.reset();
         _oxygenController.forward();
       }
@@ -820,7 +820,6 @@ class _PondDashboardState extends State<PondDashboard>
                         ],
                       ),
                     ),
-
                     SizedBox(width: 10),
                     IconButton(
                       onPressed: _logout,
@@ -851,11 +850,10 @@ class _PondDashboardState extends State<PondDashboard>
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                (connectionStatus == "Connected"
-                                        ? Colors.green
-                                        : Colors.red)
-                                    .withOpacity(0.5),
+                            color: (connectionStatus == "Connected"
+                                    ? Colors.green
+                                    : Colors.red)
+                                .withOpacity(0.5),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),
@@ -884,6 +882,39 @@ class _PondDashboardState extends State<PondDashboard>
                     ),
                   );
                 },
+              ),
+
+              // Graph Button
+              Container(
+                margin: EdgeInsets.only(top: 10),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => GraphScreen(deviceId: deviceId),
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.show_chart, color: Colors.white),
+                  label: Text(
+                    'Graph',
+                    style: context.textStyles.body.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    elevation: 5,
+                    shadowColor: Colors.white.withOpacity(0.3),
+                  ),
+                ),
               ),
 
               // Water Quality Banner
@@ -1099,7 +1130,6 @@ class _PondDashboardState extends State<PondDashboard>
             ),
           ),
           SizedBox(height: 10),
-
           Expanded(
             child: CustomPaint(
               size: Size(60, double.infinity),
@@ -1110,9 +1140,7 @@ class _PondDashboardState extends State<PondDashboard>
               ),
             ),
           ),
-
           SizedBox(height: 8),
-
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -1120,7 +1148,6 @@ class _PondDashboardState extends State<PondDashboard>
               style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
-
           Text(
             _getTemperatureStatus(displayedTemperature),
             style: context.textStyles.caption.copyWith(color: Colors.white70),
@@ -1157,7 +1184,6 @@ class _PondDashboardState extends State<PondDashboard>
             ),
           ),
           SizedBox(height: 10),
-
           Expanded(
             child: CustomPaint(
               size: Size(double.infinity, 80),
@@ -1167,9 +1193,7 @@ class _PondDashboardState extends State<PondDashboard>
               ),
             ),
           ),
-
           SizedBox(height: 8),
-
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -1177,7 +1201,6 @@ class _PondDashboardState extends State<PondDashboard>
               style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
-
           Text(
             _getPhStatus(displayedPhLevel),
             style: context.textStyles.caption.copyWith(color: Colors.white70),
@@ -1214,7 +1237,6 @@ class _PondDashboardState extends State<PondDashboard>
             ),
           ),
           SizedBox(height: 10),
-
           Expanded(
             child: AnimatedBuilder(
               animation: _bubbleAnimation,
@@ -1231,9 +1253,7 @@ class _PondDashboardState extends State<PondDashboard>
               },
             ),
           ),
-
           SizedBox(height: 8),
-
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -1241,7 +1261,6 @@ class _PondDashboardState extends State<PondDashboard>
               style: context.textStyles.subtitle.copyWith(color: Colors.white),
             ),
           ),
-
           Text(
             _getOxygenStatus(displayedDissolvedOxygen),
             style: context.textStyles.caption.copyWith(color: Colors.white70),

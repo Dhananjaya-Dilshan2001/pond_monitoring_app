@@ -3,8 +3,8 @@ import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:imesh_ayya/core/app_sizes.dart';
-import 'package:imesh_ayya/screen/dashboard_screen.dart';
+import 'package:pond_monitoring_app/core/app_sizes.dart';
+import 'package:pond_monitoring_app/screen/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -119,26 +119,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Icon(Icons.waves, color: Colors.white, size: 48),
                   ),
-
                   SizedBox(height: 40),
-
                   Text(
                     'Pond Monitoring System',
                     style: context.textStyles.h1.copyWith(color: Colors.white),
                     textAlign: TextAlign.center,
                   ),
-
                   SizedBox(height: 20),
-
                   Text(
                     'Connect to Your Device',
                     style: context.textStyles.title.copyWith(
                       color: Colors.white70,
                     ),
                   ),
-
                   SizedBox(height: 40),
-
                   Container(
                     padding: EdgeInsets.all(32),
                     decoration: BoxDecoration(
@@ -179,9 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-
                         SizedBox(height: 20),
-
                         TextField(
                           controller: _passwordController,
                           obscureText: true,
@@ -206,9 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-
                         SizedBox(height: 30),
-
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -230,7 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
-
                         if (_errorMessage.isNotEmpty) ...[
                           SizedBox(height: 20),
                           Container(

@@ -1,11 +1,11 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:imesh_ayya/core/app_sizes.dart';
-import 'package:imesh_ayya/screen/logging_screen.dart';
+import 'package:pond_monitoring_app/core/app_sizes.dart';
+import 'package:pond_monitoring_app/screen/logging_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'dart:math' as math;
@@ -19,7 +19,11 @@ void main() async {
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  if (defaultTargetPlatform == TargetPlatform.windows) {
+  // Initialize window manager only for desktop platforms (not web)
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS)) {
     await windowManager.ensureInitialized();
     WindowOptions windowOptions = WindowOptions(
       size: Size(1500, 800),
@@ -863,8 +867,7 @@ class OxygenGaugePainter extends CustomPainter {
       final angle = (2 * math.pi * i / 12) + (bubbleAnimation * math.pi / 3);
       final bubbleRadius =
           radius * (0.4 + 0.3 * math.sin(bubbleAnimation * math.pi + i));
-      final bubbleSize =
-          (4 + random.nextDouble() * 6) *
+      final bubbleSize = (4 + random.nextDouble() * 6) *
           (0.6 + 0.4 * math.sin(bubbleAnimation * 2 * math.pi + i));
 
       final bubbleX = center.dx + bubbleRadius * math.cos(angle);
@@ -920,12 +923,10 @@ class OxygenGaugePainter extends CustomPainter {
             textPainter.layout();
 
             final textRadius = radius - 35;
-            final textX =
-                center.dx +
+            final textX = center.dx +
                 textRadius * math.cos(angle) -
                 textPainter.width / 2;
-            final textY =
-                center.dy +
+            final textY = center.dy +
                 textRadius * math.sin(angle) -
                 textPainter.height / 2;
 
