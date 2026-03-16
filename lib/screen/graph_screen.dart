@@ -258,7 +258,12 @@ class _GraphScreenState extends State<GraphScreen> {
 
     // Add temperature data
     for (final reading in temperatureData) {
-      final timestamp = DateTime.parse(reading['created_at']).toIso8601String();
+      final parsed = DateTime.parse(reading['created_at']).toLocal();
+      final timestamp = '${parsed.year.toString().padLeft(4, '0')}.'
+          '${parsed.month.toString().padLeft(2, '0')}.'
+          '${parsed.day.toString().padLeft(2, '0')} - '
+          '${parsed.hour.toString().padLeft(2, '0')}.'
+          '${parsed.minute.toString().padLeft(2, '0')}';
       final deviceId = reading['device_id'] ?? widget.deviceId;
       final value = (reading['value'] as num).toDouble().toStringAsFixed(2);
       csvRows.add([timestamp, deviceId, 'Temperature', value, '°C']);
@@ -266,7 +271,12 @@ class _GraphScreenState extends State<GraphScreen> {
 
     // Add dissolved oxygen data
     for (final reading in dissolvedOxygenData) {
-      final timestamp = DateTime.parse(reading['created_at']).toIso8601String();
+      final parsed = DateTime.parse(reading['created_at']).toLocal();
+      final timestamp = '${parsed.year.toString().padLeft(4, '0')}.'
+          '${parsed.month.toString().padLeft(2, '0')}.'
+          '${parsed.day.toString().padLeft(2, '0')} - '
+          '${parsed.hour.toString().padLeft(2, '0')}.'
+          '${parsed.minute.toString().padLeft(2, '0')}';
       final deviceId = reading['device_id'] ?? widget.deviceId;
       final value = (reading['value'] as num).toDouble().toStringAsFixed(2);
       csvRows.add([timestamp, deviceId, 'Dissolved Oxygen', value, 'mg/L']);
@@ -588,36 +598,91 @@ class _GraphScreenState extends State<GraphScreen> {
     return spots;
   }
 
+  double _calculateXAxisInterval(List<FlSpot> spots) {
+    if (spots.length < 2) return 1;
+
+    final spanMinutes = (spots.last.x - spots.first.x).abs();
+    if (spanMinutes <= 0) return 1;
+
+    // First, middle, last -> three x-axis labels.
+    return spanMinutes / 2;
+  }
+
+  List<double> _getKeyXAxisValues(List<FlSpot> spots) {
+    if (spots.isEmpty) return [];
+    if (spots.length == 1) return [spots.first.x];
+    if (spots.length == 2) return [spots.first.x, spots.last.x];
+
+    final first = spots.first.x;
+    final last = spots.last.x;
+    final middle = spots[spots.length ~/ 2].x;
+
+    return [first, middle, last];
+  }
+
+  String _formatXAxisLabel(
+    double value,
+    List<Map<String, dynamic>> rawData,
+    String filter,
+  ) {
+    if (rawData.isEmpty) return '';
+
+    final sorted = [...rawData]..sort((a, b) {
+        final aTime = DateTime.parse(a['created_at']).millisecondsSinceEpoch;
+        final bTime = DateTime.parse(b['created_at']).millisecondsSinceEpoch;
+        return aTime.compareTo(bTime);
+      });
+
+    final startTime = DateTime.parse(sorted.first['created_at']).toLocal();
+    final endTime = DateTime.parse(sorted.last['created_at']).toLocal();
+    final spanMinutes = endTime.difference(startTime).inMinutes.abs();
+
+    final pointTime = startTime.add(Duration(minutes: value.round()));
+    final hh = pointTime.hour.toString().padLeft(2, '0');
+    final mm = pointTime.minute.toString().padLeft(2, '0');
+    final dd = pointTime.day.toString().padLeft(2, '0');
+    final mon = pointTime.month.toString().padLeft(2, '0');
+
+    switch (filter) {
+      case '1hour':
+      case '24hours':
+        return '$hh:$mm';
+      case 'week':
+      case 'month':
+        return '$dd/$mon';
+      default:
+        if (spanMinutes <= 1440) {
+          return '$hh:$mm';
+        }
+        return '$dd/$mon';
+    }
+  }
+
   Map<String, dynamic> _getAxisLabels(String filter) {
     switch (filter) {
       case '1hour':
         return {
-          'unit': 'minutes',
-          'format': (double value) => '${value.toInt()}m',
+          'unit': 'HH:mm',
           'interval': 10.0, // Show every 10 minutes
         };
       case '24hours':
         return {
-          'unit': 'hours',
-          'format': (double value) => '${(value / 60).toInt()}h',
+          'unit': 'HH:mm',
           'interval': 120.0, // Show every 2 hours
         };
       case 'week':
         return {
-          'unit': 'days',
-          'format': (double value) => '${(value / (60 * 24)).toInt()}d',
+          'unit': 'dd/MM',
           'interval': 1440.0, // Show every day
         };
       case 'month':
         return {
-          'unit': 'days',
-          'format': (double value) => '${(value / (60 * 24)).toInt()}d',
+          'unit': 'dd/MM',
           'interval': 4320.0, // Show every 3 days
         };
       default: // 'all'
         return {
-          'unit': 'hours',
-          'format': (double value) => '${(value / 60).toInt()}h',
+          'unit': 'auto (HH:mm / dd/MM)',
           'interval': 240.0, // Show every 4 hours
         };
     }
@@ -631,6 +696,8 @@ class _GraphScreenState extends State<GraphScreen> {
   }) {
     final spots = _prepareChartData(data);
     final axisLabels = _getAxisLabels(selectedFilter);
+    final xAxisInterval = _calculateXAxisInterval(spots);
+    final keyXAxisValues = _getKeyXAxisValues(spots);
 
     return Container(
       margin: EdgeInsets.all(16.w),
@@ -696,14 +763,41 @@ class _GraphScreenState extends State<GraphScreen> {
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 30,
-                            interval: axisLabels['interval'] as double,
+                            reservedSize: 36,
+                            interval: xAxisInterval,
                             getTitlesWidget: (value, meta) {
-                              return Text(
-                                (axisLabels['format'] as Function(double))(value),
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12.sp,
+                              if (keyXAxisValues.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              final threshold = xAxisInterval / 3;
+                              final nearestKey = keyXAxisValues.reduce(
+                                (a, b) => (a - value).abs() <= (b - value).abs()
+                                    ? a
+                                    : b,
+                              );
+
+                              final shouldShow =
+                                  (nearestKey - value).abs() <= threshold;
+
+                              if (!shouldShow) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                fitInside:
+                                    SideTitleFitInsideData.fromTitleMeta(meta),
+                                child: Text(
+                                  _formatXAxisLabel(
+                                    nearestKey,
+                                    data,
+                                    selectedFilter,
+                                  ),
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12.sp,
+                                  ),
                                 ),
                               );
                             },

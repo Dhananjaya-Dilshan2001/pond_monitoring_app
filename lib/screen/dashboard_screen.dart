@@ -1,6 +1,7 @@
 // Main Dashboard with Sensor Data and Motor Controls
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,7 +12,6 @@ import 'package:pond_monitoring_app/screen/graph_screen.dart';
 
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
-import 'package:pond_monitoring_app/main.dart';
 
 class PondDashboard extends StatefulWidget {
   final String deviceId;
@@ -28,8 +28,9 @@ class PondDashboard extends StatefulWidget {
 }
 
 class _PondDashboardState extends State<PondDashboard>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   bool _isShuttingDown = false;
+  bool _isInBackground = false;
 
   void _safeSetState(VoidCallback fn) {
     if (!mounted || _isShuttingDown) return;
@@ -114,6 +115,7 @@ class _PondDashboardState extends State<PondDashboard>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     deviceId = widget.deviceId;
     mqttDataTopic = "idea8/${deviceId}/data";
@@ -235,7 +237,40 @@ class _PondDashboardState extends State<PondDashboard>
       });
     });
 
-    connectToMQTT();
+    connectToMQTT().catchError((error) {
+      _safeSetState(() {
+        connectionStatus = "Connection Failed";
+      });
+      print('Unexpected MQTT connect error: $error');
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isShuttingDown) return;
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _isInBackground = true;
+      client?.autoReconnect = false;
+      _mqttUpdatesSubscription?.cancel();
+      _mqttUpdatesSubscription = null;
+      client?.disconnect();
+      _safeSetState(() {
+        connectionStatus = "Paused";
+      });
+    } else if (state == AppLifecycleState.resumed && _isInBackground) {
+      _isInBackground = false;
+      if (mounted && !_isShuttingDown) {
+        connectToMQTT().catchError((error) {
+          _safeSetState(() {
+            connectionStatus = "Connection Failed";
+          });
+          print('MQTT resume connect error: $error');
+        });
+      }
+    }
   }
 
   Future<void> connectToMQTT() async {
@@ -266,7 +301,25 @@ class _PondDashboardState extends State<PondDashboard>
         .withWillQos(MqttQos.atLeastOnce);
 
     try {
-      await client!.connect();
+      final connResult = await client!.connect();
+
+      if (connResult == null ||
+          connResult.returnCode != MqttConnectReturnCode.connectionAccepted) {
+        _safeSetState(() {
+          connectionStatus = "Connection Rejected";
+        });
+        print(
+          'MQTT connect rejected: ${connResult?.returnCode ?? "unknown"}',
+        );
+        client?.disconnect();
+        return;
+      }
+    } on SocketException catch (e) {
+      client?.disconnect();
+      _safeSetState(() {
+        connectionStatus = "Connection Failed";
+      });
+      print('MQTT socket error: $e');
     } catch (e) {
       client?.disconnect();
       _safeSetState(() {
@@ -642,6 +695,7 @@ class _PondDashboardState extends State<PondDashboard>
   }
 
   void onDisconnected() {
+    if (_isInBackground || _isShuttingDown) return;
     _safeSetState(() {
       connectionStatus = "Disconnected";
     });
@@ -1439,6 +1493,7 @@ class _PondDashboardState extends State<PondDashboard>
   @override
   void dispose() {
     _isShuttingDown = true;
+    WidgetsBinding.instance.removeObserver(this);
     _mqttUpdatesSubscription?.cancel();
     _mqttUpdatesSubscription = null;
 

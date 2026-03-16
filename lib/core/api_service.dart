@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl =
-      'https://abdul-nondivergent-penny.ngrok-free.dev';
+  static const String baseUrl = 'https://pond.idea8.cloud/';
 
   static Future<List<Map<String, dynamic>>> fetchReadings({
     required String type,
