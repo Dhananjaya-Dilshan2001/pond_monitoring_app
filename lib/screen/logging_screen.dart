@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:pond_monitoring_app/core/app_sizes.dart';
+import 'package:pond_monitoring_app/core/local_storage_service.dart';
 import 'package:pond_monitoring_app/screen/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,7 +18,32 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
-  Future<void> _validateDevice() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentialsAndTryLogin();
+  }
+
+  Future<void> _loadSavedCredentialsAndTryLogin() async {
+    try {
+      final savedCredential =
+          await LocalStorageService.instance.getUserCredential();
+      if (!mounted || savedCredential == null) return;
+
+      final savedUsername = savedCredential['username']?.trim() ?? '';
+      final savedPassword = savedCredential['password']?.trim() ?? '';
+      if (savedUsername.isEmpty || savedPassword.isEmpty) return;
+
+      _deviceIdController.text = savedUsername;
+      _passwordController.text = savedPassword;
+
+      await _validateDevice(isAutoLogin: true);
+    } catch (_) {
+      // Keep current manual login flow if local credential loading fails.
+    }
+  }
+
+  Future<void> _validateDevice({bool isAutoLogin = false}) async {
     if (_deviceIdController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter both Device ID and Password';
@@ -39,8 +65,13 @@ class _LoginScreenState extends State<LoginScreen> {
       log("Device Document: ${deviceDoc.data()}");
 
       if (!deviceDoc.exists) {
+        if (isAutoLogin) {
+          await LocalStorageService.instance.clearUserCredential();
+        }
         setState(() {
-          _errorMessage = 'Device ID not found';
+          _errorMessage = isAutoLogin
+              ? 'Saved credentials are not valid. Please login again.'
+              : 'Device ID not found';
           _isLoading = false;
         });
         return;
@@ -51,8 +82,13 @@ class _LoginScreenState extends State<LoginScreen> {
       String storedPassword = deviceData['password'] ?? '';
 
       if (storedPassword != _passwordController.text.trim()) {
+        if (isAutoLogin) {
+          await LocalStorageService.instance.clearUserCredential();
+        }
         setState(() {
-          _errorMessage = 'Incorrect password';
+          _errorMessage = isAutoLogin
+              ? 'Saved credentials are not valid. Please login again.'
+              : 'Incorrect password';
           _isLoading = false;
         });
         return;
@@ -67,6 +103,11 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       FocusScope.of(context).unfocus();
+
+      await LocalStorageService.instance.saveUserCredential(
+        username: _deviceIdController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -203,7 +244,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _validateDevice,
+                            onPressed:
+                                _isLoading ? null : () => _validateDevice(),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.cyan,
                               shape: RoundedRectangleBorder(

@@ -37,6 +37,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_screenutil: ^5.9.3
+  flutter_secure_storage: ^10.0.0
   http: ^1.2.1
   mqtt_client: ^10.11.9
   path_provider: ^2.1.3

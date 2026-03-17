@@ -1,17 +1,25 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pond_monitoring_app/core/api_service.dart';
-import 'package:pond_monitoring_app/core/app_sizes.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 // Conditional import for web
 import 'package:universal_html/html.dart' as html show Blob, Url, AnchorElement;
+
+class _PreparedChartData {
+  final List<FlSpot> spots;
+  final DateTime? startTime;
+
+  const _PreparedChartData({
+    required this.spots,
+    required this.startTime,
+  });
+}
 
 class GraphScreen extends StatefulWidget {
   final String deviceId;
@@ -26,14 +34,18 @@ class GraphScreen extends StatefulWidget {
 }
 
 class _GraphScreenState extends State<GraphScreen> {
-  String selectedFilter = 'all';
+  String selectedFilter = '1hour';
   List<Map<String, dynamic>> temperatureData = [];
   List<Map<String, dynamic>> dissolvedOxygenData = [];
+  List<FlSpot> temperatureSpots = [];
+  List<FlSpot> dissolvedOxygenSpots = [];
+  DateTime? _temperatureStartTime;
+  DateTime? _dissolvedOxygenStartTime;
   bool isLoading = true;
+  int _activeRequestId = 0;
   Timer? _refreshTimer;
 
   final List<String> filterOptions = [
-    'all',
     '1hour',
     '24hours',
     'week',
@@ -41,7 +53,6 @@ class _GraphScreenState extends State<GraphScreen> {
   ];
 
   final List<String> filterDisplayNames = [
-    'All',
     'Last hour',
     'Last 24 hours',
     'Last week',
@@ -59,11 +70,11 @@ class _GraphScreenState extends State<GraphScreen> {
   @override
   void initState() {
     super.initState();
-    fetchData();
+    _fetchDataForFilter(selectedFilter);
     // Auto refresh every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) {
-        fetchData();
+        _fetchDataForFilter(selectedFilter, showLoading: false);
       }
     });
   }
@@ -74,36 +85,62 @@ class _GraphScreenState extends State<GraphScreen> {
     super.dispose();
   }
 
-  Future<void> fetchData() async {
+  Future<void> _fetchDataForFilter(
+    String filter, {
+    bool showLoading = true,
+  }) async {
     if (!mounted) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    final activeFilter = filterOptions.contains(filter) ? filter : '1hour';
+    final requestId = ++_activeRequestId;
+
+    if (showLoading) {
+      setState(() {
+        if (selectedFilter != activeFilter) {
+          selectedFilter = activeFilter;
+        }
+        isLoading = true;
+      });
+    } else if (selectedFilter != activeFilter) {
+      setState(() {
+        selectedFilter = activeFilter;
+      });
+    }
 
     try {
-      final tempData = await ApiService.fetchReadings(
-        type: 'temperature',
-        filter: selectedFilter,
-        deviceId: widget.deviceId,
-      );
+      final results = await Future.wait([
+        ApiService.fetchReadings(
+          type: 'temperature',
+          filter: activeFilter,
+          deviceId: widget.deviceId,
+        ),
+        ApiService.fetchReadings(
+          type: 'do',
+          filter: activeFilter,
+          deviceId: widget.deviceId,
+        ),
+      ]);
 
-      final doData = await ApiService.fetchReadings(
-        type: 'do',
-        filter: selectedFilter,
-        deviceId: widget.deviceId,
-      );
+      if (!mounted || requestId != _activeRequestId) return;
 
-      if (mounted) {
-        setState(() {
-          temperatureData = tempData;
-          dissolvedOxygenData = doData;
-          isLoading = false;
-        });
-      }
+      final tempData = List<Map<String, dynamic>>.from(results[0]);
+      final doData = List<Map<String, dynamic>>.from(results[1]);
+
+      final preparedTemperature = _prepareChartData(tempData);
+      final preparedDo = _prepareChartData(doData);
+
+      setState(() {
+        temperatureData = tempData;
+        dissolvedOxygenData = doData;
+        temperatureSpots = preparedTemperature.spots;
+        dissolvedOxygenSpots = preparedDo.spots;
+        _temperatureStartTime = preparedTemperature.startTime;
+        _dissolvedOxygenStartTime = preparedDo.startTime;
+        isLoading = false;
+      });
     } catch (e) {
       print('Error fetching graph data: $e');
-      if (mounted) {
+      if (mounted && requestId == _activeRequestId) {
         setState(() {
           isLoading = false;
         });
@@ -116,7 +153,7 @@ class _GraphScreenState extends State<GraphScreen> {
       setState(() {
         selectedFilter = newFilter;
       });
-      fetchData();
+      _fetchDataForFilter(newFilter);
     }
   }
 
@@ -235,8 +272,6 @@ class _GraphScreenState extends State<GraphScreen> {
 
   String _getReadableFilterName(String filter) {
     switch (filter) {
-      case 'all':
-        return 'all';
       case '1hour':
         return 'last_hour';
       case '24hours':
@@ -254,36 +289,89 @@ class _GraphScreenState extends State<GraphScreen> {
     final List<List<String>> csvRows = [];
 
     // Add header
-    csvRows.add(['Timestamp', 'Device ID', 'Sensor Type', 'Value', 'Unit']);
+    csvRows.add([
+      'Timestamp',
+      'Device ID',
+      'Temperature (°C)',
+      'DO Value (mg/L)',
+    ]);
 
-    // Add temperature data
+    String formatTimestamp(DateTime parsed) {
+      return '${parsed.year.toString().padLeft(4, '0')}.'
+          '${parsed.month.toString().padLeft(2, '0')}.'
+          '${parsed.day.toString().padLeft(2, '0')} - '
+          '${parsed.hour.toString().padLeft(2, '0')}.'
+          '${parsed.minute.toString().padLeft(2, '0')}';
+    }
+
+    final Map<int, Map<String, String>> mergedRows = {};
+
+    void addTemperature(Map<String, dynamic> reading) {
+      final parsed = DateTime.parse(reading['created_at']).toLocal();
+      final minuteKey = DateTime(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+      ).millisecondsSinceEpoch;
+
+      final row = mergedRows.putIfAbsent(minuteKey, () {
+        final normalizedTime = DateTime.fromMillisecondsSinceEpoch(minuteKey);
+        return {
+          'timestamp': formatTimestamp(normalizedTime),
+          'deviceId': (reading['device_id'] ?? widget.deviceId).toString(),
+          'temperature': '',
+          'doValue': '',
+        };
+      });
+
+      row['temperature'] =
+          (reading['value'] as num).toDouble().toStringAsFixed(2);
+    }
+
+    void addDoValue(Map<String, dynamic> reading) {
+      final parsed = DateTime.parse(reading['created_at']).toLocal();
+      final minuteKey = DateTime(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+      ).millisecondsSinceEpoch;
+
+      final row = mergedRows.putIfAbsent(minuteKey, () {
+        final normalizedTime = DateTime.fromMillisecondsSinceEpoch(minuteKey);
+        return {
+          'timestamp': formatTimestamp(normalizedTime),
+          'deviceId': (reading['device_id'] ?? widget.deviceId).toString(),
+          'temperature': '',
+          'doValue': '',
+        };
+      });
+
+      row['doValue'] = (reading['value'] as num).toDouble().toStringAsFixed(2);
+    }
+
     for (final reading in temperatureData) {
-      final parsed = DateTime.parse(reading['created_at']).toLocal();
-      final timestamp = '${parsed.year.toString().padLeft(4, '0')}.'
-          '${parsed.month.toString().padLeft(2, '0')}.'
-          '${parsed.day.toString().padLeft(2, '0')} - '
-          '${parsed.hour.toString().padLeft(2, '0')}.'
-          '${parsed.minute.toString().padLeft(2, '0')}';
-      final deviceId = reading['device_id'] ?? widget.deviceId;
-      final value = (reading['value'] as num).toDouble().toStringAsFixed(2);
-      csvRows.add([timestamp, deviceId, 'Temperature', value, '°C']);
+      addTemperature(reading);
     }
 
-    // Add dissolved oxygen data
     for (final reading in dissolvedOxygenData) {
-      final parsed = DateTime.parse(reading['created_at']).toLocal();
-      final timestamp = '${parsed.year.toString().padLeft(4, '0')}.'
-          '${parsed.month.toString().padLeft(2, '0')}.'
-          '${parsed.day.toString().padLeft(2, '0')} - '
-          '${parsed.hour.toString().padLeft(2, '0')}.'
-          '${parsed.minute.toString().padLeft(2, '0')}';
-      final deviceId = reading['device_id'] ?? widget.deviceId;
-      final value = (reading['value'] as num).toDouble().toStringAsFixed(2);
-      csvRows.add([timestamp, deviceId, 'Dissolved Oxygen', value, 'mg/L']);
+      addDoValue(reading);
     }
 
-    // Sort by timestamp
-    csvRows.sublist(1).sort((a, b) => a[0].compareTo(b[0]));
+    final sortedKeys = mergedRows.keys.toList()..sort();
+
+    for (final key in sortedKeys) {
+      final row = mergedRows[key]!;
+      csvRows.add([
+        row['timestamp'] ?? '',
+        row['deviceId'] ?? widget.deviceId,
+        row['temperature'] ?? '',
+        row['doValue'] ?? '',
+      ]);
+    }
 
     // Convert to CSV string
     return const ListToCsvConverter().convert(csvRows);
@@ -423,34 +511,6 @@ class _GraphScreenState extends State<GraphScreen> {
     }
   }
 
-  void _showDownloadDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Color(0xFF4A90E2),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-              SizedBox(height: 16.h),
-              Text(
-                'Generating CSV...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16.sp,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showProgressDialog() {
     _progressValue = 0.0;
     _progressText = 'Starting...';
@@ -570,32 +630,53 @@ class _GraphScreenState extends State<GraphScreen> {
     );
   }
 
-  List<FlSpot> _prepareChartData(List<Map<String, dynamic>> data) {
-    if (data.isEmpty) return [];
+  _PreparedChartData _prepareChartData(List<Map<String, dynamic>> data) {
+    if (data.isEmpty) {
+      return const _PreparedChartData(spots: [], startTime: null);
+    }
 
-    // Sort data by timestamp
-    data.sort((a, b) {
-      final aTime = DateTime.parse(a['created_at']).millisecondsSinceEpoch;
-      final bTime = DateTime.parse(b['created_at']).millisecondsSinceEpoch;
-      return aTime.compareTo(bTime);
-    });
+    final sortedData = [...data]..sort((a, b) {
+        final aTime = DateTime.parse(a['created_at']).millisecondsSinceEpoch;
+        final bTime = DateTime.parse(b['created_at']).millisecondsSinceEpoch;
+        return aTime.compareTo(bTime);
+      });
 
     final spots = <FlSpot>[];
-    final startTime = DateTime.parse(data.first['created_at'])
-        .millisecondsSinceEpoch
-        .toDouble();
+    final startTime = DateTime.parse(sortedData.first['created_at']).toLocal();
+    final startTimestamp = startTime.millisecondsSinceEpoch.toDouble();
 
-    for (final reading in data) {
+    for (final reading in sortedData) {
       final timestamp = DateTime.parse(reading['created_at'])
           .millisecondsSinceEpoch
           .toDouble();
       final value = (reading['value'] as num).toDouble();
-      final x = (timestamp - startTime) /
+      final x = (timestamp - startTimestamp) /
           (1000 * 60); // Convert to minutes from start
       spots.add(FlSpot(x, value));
     }
 
-    return spots;
+    final optimizedSpots = _downsampleSpots(spots, maxPoints: 220);
+    return _PreparedChartData(spots: optimizedSpots, startTime: startTime);
+  }
+
+  List<FlSpot> _downsampleSpots(
+    List<FlSpot> spots, {
+    int maxPoints = 220,
+  }) {
+    if (spots.length <= maxPoints) return spots;
+
+    final sampled = <FlSpot>[];
+    final step = (spots.length / maxPoints).ceil();
+
+    for (int i = 0; i < spots.length; i += step) {
+      sampled.add(spots[i]);
+    }
+
+    if (sampled.last.x != spots.last.x || sampled.last.y != spots.last.y) {
+      sampled.add(spots.last);
+    }
+
+    return sampled;
   }
 
   double _calculateXAxisInterval(List<FlSpot> spots) {
@@ -622,20 +703,11 @@ class _GraphScreenState extends State<GraphScreen> {
 
   String _formatXAxisLabel(
     double value,
-    List<Map<String, dynamic>> rawData,
+    DateTime? startTime,
+    double spanMinutes,
     String filter,
   ) {
-    if (rawData.isEmpty) return '';
-
-    final sorted = [...rawData]..sort((a, b) {
-        final aTime = DateTime.parse(a['created_at']).millisecondsSinceEpoch;
-        final bTime = DateTime.parse(b['created_at']).millisecondsSinceEpoch;
-        return aTime.compareTo(bTime);
-      });
-
-    final startTime = DateTime.parse(sorted.first['created_at']).toLocal();
-    final endTime = DateTime.parse(sorted.last['created_at']).toLocal();
-    final spanMinutes = endTime.difference(startTime).inMinutes.abs();
+    if (startTime == null) return '';
 
     final pointTime = startTime.add(Duration(minutes: value.round()));
     final hh = pointTime.hour.toString().padLeft(2, '0');
@@ -680,24 +752,25 @@ class _GraphScreenState extends State<GraphScreen> {
           'unit': 'dd/MM',
           'interval': 4320.0, // Show every 3 days
         };
-      default: // 'all'
+      default:
         return {
-          'unit': 'auto (HH:mm / dd/MM)',
-          'interval': 240.0, // Show every 4 hours
+          'unit': 'HH:mm',
+          'interval': 120.0,
         };
     }
   }
 
   Widget _buildChart({
     required String title,
-    required List<Map<String, dynamic>> data,
+    required List<FlSpot> spots,
+    required DateTime? startTime,
     required Color color,
     required String unit,
   }) {
-    final spots = _prepareChartData(data);
     final axisLabels = _getAxisLabels(selectedFilter);
     final xAxisInterval = _calculateXAxisInterval(spots);
     final keyXAxisValues = _getKeyXAxisValues(spots);
+    final spanMinutes = spots.length < 2 ? 0.0 : (spots.last.x - spots.first.x);
 
     return Container(
       margin: EdgeInsets.all(16.w),
@@ -791,7 +864,8 @@ class _GraphScreenState extends State<GraphScreen> {
                                 child: Text(
                                   _formatXAxisLabel(
                                     nearestKey,
-                                    data,
+                                    startTime,
+                                    spanMinutes,
                                     selectedFilter,
                                   ),
                                   style: TextStyle(
@@ -936,7 +1010,9 @@ class _GraphScreenState extends State<GraphScreen> {
                   border: Border.all(color: Colors.white.withOpacity(0.3)),
                 ),
                 child: DropdownButton<String>(
-                  value: selectedFilter,
+                  value: filterOptions.contains(selectedFilter)
+                      ? selectedFilter
+                      : filterOptions.first,
                   onChanged: _onFilterChanged,
                   items: List.generate(filterOptions.length, (index) {
                     return DropdownMenuItem<String>(
@@ -964,13 +1040,15 @@ class _GraphScreenState extends State<GraphScreen> {
                     children: [
                       _buildChart(
                         title: 'Temperature vs Time',
-                        data: temperatureData,
+                        spots: temperatureSpots,
+                        startTime: _temperatureStartTime,
                         color: Colors.orange,
                         unit: '°C',
                       ),
                       _buildChart(
                         title: 'Dissolved Oxygen vs Time',
-                        data: dissolvedOxygenData,
+                        spots: dissolvedOxygenSpots,
+                        startTime: _dissolvedOxygenStartTime,
                         color: Colors.blue,
                         unit: 'mg/L',
                       ),

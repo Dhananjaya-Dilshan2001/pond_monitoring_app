@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pond_monitoring_app/core/app_sizes.dart';
+import 'package:pond_monitoring_app/core/local_storage_service.dart';
 import 'package:pond_monitoring_app/main.dart';
 import 'package:pond_monitoring_app/screen/logging_screen.dart';
 import 'package:pond_monitoring_app/screen/graph_screen.dart';
@@ -435,9 +436,9 @@ class _PondDashboardState extends State<PondDashboard>
       }
 
       if (jsonData.containsKey('timestamp')) {
-        lastUpdate = jsonData['timestamp'].toString();
+        lastUpdate = _formatLastUpdate(jsonData['timestamp']);
       } else {
-        lastUpdate = DateTime.now().toString().substring(11, 19);
+        lastUpdate = _formatTime(DateTime.now());
       }
 
       messagesReceived++;
@@ -490,6 +491,49 @@ class _PondDashboardState extends State<PondDashboard>
     } catch (e) {
       print('Error updating sensor data: $e');
     }
+  }
+
+  String _formatLastUpdate(dynamic rawTimestamp) {
+    try {
+      DateTime parsed;
+
+      if (rawTimestamp is num) {
+        final value = rawTimestamp.toInt();
+        // Treat 10-digit values as seconds and 13-digit values as milliseconds.
+        final millis = value < 100000000000 ? value * 1000 : value;
+        parsed =
+            DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true).toLocal();
+      } else {
+        final raw = rawTimestamp.toString().trim();
+        final numeric = int.tryParse(raw);
+
+        if (numeric != null) {
+          final millis = numeric < 100000000000 ? numeric * 1000 : numeric;
+          parsed = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true)
+              .toLocal();
+        } else {
+          parsed = DateTime.parse(raw).toLocal();
+        }
+      }
+
+      return _formatTime(parsed);
+    } catch (_) {
+      return _formatTime(DateTime.now());
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    final hh = time.hour.toString().padLeft(2, '0');
+    final mm = time.minute.toString().padLeft(2, '0');
+    return '$hh.$mm';
+  }
+
+  String formatTimestamp(DateTime parsed) {
+    return '${parsed.year.toString().padLeft(4, '0')}.'
+        '${parsed.month.toString().padLeft(2, '0')}.'
+        '${parsed.day.toString().padLeft(2, '0')} - '
+        '${parsed.hour.toString().padLeft(2, '0')}.'
+        '${parsed.minute.toString().padLeft(2, '0')}';
   }
 
   void updateMotorStatus(Map<String, dynamic> jsonData) {
@@ -729,6 +773,7 @@ class _PondDashboardState extends State<PondDashboard>
     _mqttUpdatesSubscription = null;
     client?.autoReconnect = false;
     client?.disconnect();
+    LocalStorageService.instance.clearUserCredential();
     appNavigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen()),
       (route) => false,
